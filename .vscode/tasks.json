@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start AI MONITOR (.bat)",
+            "type": "shell",
+            "command": "${workspaceFolder}\\START_AI_MONITOR.bat",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}
