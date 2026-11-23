@@ -9,9 +9,25 @@ const API = {
     if (!r.ok) throw Error("Не удалось просканировать камеры");
     return r.json();
   },
+  async detectNetwork() {
+    let r = await fetch("/api/network-cameras", { method: "POST" });
+    let j = await r.json();
+    if (!r.ok) throw Error(j.detail || "Не удалось найти камеры в локальной сети");
+    return j;
+  },
   async add(data) {
     let r = await fetch("/api/cameras", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+    let j = await r.json();
+    if (!r.ok) throw Error(j.detail || "Ошибка");
+    return j;
+  },
+  async update(id, data) {
+    let r = await fetch("/api/cameras/" + id, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });

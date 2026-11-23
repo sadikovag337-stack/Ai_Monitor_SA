@@ -6,6 +6,26 @@ async function load() {
   }
 }
 
+let editingCameraId = null;
+
+window.beginCameraEdit = (camera) => {
+  editingCameraId = camera.id;
+  document.getElementById("name").value = camera.name;
+  document.getElementById("vendor").value = "generic";
+  document.getElementById("url").value = `rtsp://${camera.host}:554/`;
+  document.getElementById("add").textContent = "Сохранить настройки";
+  document.getElementById("cancel-edit").hidden = false;
+  document.getElementById("url").focus();
+};
+
+function cancelCameraEdit() {
+  editingCameraId = null;
+  document.getElementById("name").value = "";
+  document.getElementById("url").value = "";
+  document.getElementById("add").textContent = "Добавить в сетку";
+  document.getElementById("cancel-edit").hidden = true;
+}
+
 document.getElementById("vendor").onchange = (e) => {
   const urlInput = document.getElementById("url");
   const nameInput = document.getElementById("name");
@@ -55,21 +75,53 @@ document.getElementById("add-laptop").onclick = async () => {
   }
 };
 
+document.getElementById("find-network").onclick = async () => {
+  const btn = document.getElementById("find-network");
+  const list = document.getElementById("network-list");
+  btn.disabled = true;
+  btn.textContent = "⏳ Поиск камер в локальной сети...";
+  list.textContent = "Ожидание ответов ONVIF...";
+  try {
+    const res = await API.detectNetwork();
+    if (!res.cameras.length) {
+      list.textContent = "Камеры ONVIF не найдены. Проверьте, что камера и компьютер в одной сети и ONVIF включен.";
+      return;
+    }
+    list.innerHTML = `<p>Найдено: ${res.cameras.length}. Автоматически добавлено: ${res.added}.</p>` + res.cameras.map(c => `
+      <div class="local-item">
+        <span>${safe(c.name)}<br><small>${safe(c.ip)} · ${c.added ? "добавлена" : "уже в списке"}</small></span>
+      </div>
+    `).join("");
+    await load();
+  } catch (e) {
+    list.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔎 Найти камеры в локальной сети";
+  }
+};
+
 document.getElementById("add").onclick = async () => {
   let name = document.getElementById("name").value.trim(),
       rtsp_url = document.getElementById("url").value.trim(),
       vendor = document.getElementById("vendor").value;
   if (!name || !rtsp_url) return alert("Заполни название и адрес потока (например, local://0)");
   try {
-    await API.add({ name, rtsp_url, vendor });
-    document.getElementById("name").value = "";
-    document.getElementById("url").value = "";
+    if (editingCameraId) {
+      await API.update(editingCameraId, { name, rtsp_url, vendor: "onvif" });
+      cancelCameraEdit();
+    } else {
+      await API.add({ name, rtsp_url, vendor });
+      document.getElementById("name").value = "";
+      document.getElementById("url").value = "";
+    }
     await load();
   } catch (e) {
     alert(e.message);
   }
 };
 
+document.getElementById("cancel-edit").onclick = cancelCameraEdit;
 document.getElementById("refresh").onclick = load;
 load();
 setInterval(load, 4000);

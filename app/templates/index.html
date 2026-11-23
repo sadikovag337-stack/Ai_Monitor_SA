@@ -20,6 +20,8 @@
       <h2>Быстрый тест</h2>
       <button id="add-laptop" class="laptop-btn">📷 Подключить камеру ноутбука</button>
       <div id="local-list" class="local-list"></div>
+      <button id="find-network" class="laptop-btn">🔎 Найти камеры в локальной сети</button>
+      <div id="network-list" class="local-list"></div>
 
       <hr class="sep">
 
@@ -40,7 +42,8 @@
       <input id="url" placeholder="local://0 или rtsp://user:pass@192.168.1.50:554/...">
 
       <button id="add">Добавить в сетку</button>
-      <small>Для камеры ноутбука используй <code>local://0</code> (или <code>local://1</code> для внешней USB-камеры).</small>
+      <button id="cancel-edit" class="secondary" hidden>Отмена</button>
+      <small>Для камеры ноутбука используй <code>local://0</code>. Найденные IP-камеры добавляются автоматически, но для подключения нужно указать их RTSP-путь и логин/пароль, если они нужны. Поиск работает только в локальной сети через ONVIF.</small>
     </aside>
 
     <section class="panel">

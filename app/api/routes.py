@@ -1,10 +1,12 @@
 import os
 import time
 import cv2
+from urllib.parse import urlsplit
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from app.db.repository import add_camera, remove_camera
+from app.db.repository import add_camera, all_cameras, remove_camera, update_camera
+from app.services.onvif_discovery import discover_onvif_cameras
 from app.services.stream_manager import manager
 
 router = APIRouter()
@@ -60,6 +62,48 @@ def detect_local_cameras():
     return {"cameras": found}
 
 
+@router.post("/network-cameras")
+def detect_network_cameras():
+    try:
+        found = discover_onvif_cameras()
+    except OSError as exc:
+        raise HTTPException(503, f"Не удалось выполнить поиск в локальной сети: {exc}") from exc
+
+    existing_by_host = {}
+    for row in all_cameras():
+        try:
+            host = urlsplit(row["rtsp_url"]).hostname
+        except ValueError:
+            host = None
+        if host:
+            existing_by_host.setdefault(host.lower(), row)
+
+    results = []
+    added = 0
+    for camera in found:
+        ip = camera["ip"]
+        existing = existing_by_host.get(ip.lower())
+        if existing:
+            results.append({
+                "id": existing["id"],
+                "ip": ip,
+                "name": existing["name"],
+                "added": False,
+            })
+            continue
+
+        name = (camera.get("name") or "ONVIF-камера")[:80]
+        cid = add_camera(name, f"rtsp://{ip}:554/", "onvif", enabled=False)
+        row = {"id": cid, "name": name}
+        existing_by_host[ip.lower()] = row
+        results.append({"id": cid, "ip": ip, "name": name, "added": True})
+        added += 1
+
+    if added:
+        manager.sync()
+    return {"cameras": results, "added": added}
+
+
 @router.get("/cameras")
 def cameras():
     return manager.statuses()
@@ -73,6 +117,17 @@ def create_camera(item: CameraInput):
     cid = add_camera(item.name.strip(), url, item.vendor)
     manager.sync()
     return {"ok": True, "id": cid}
+
+
+@router.put("/cameras/{cid}")
+def edit_camera(cid: str, item: CameraInput):
+    url = item.rtsp_url.strip()
+    if not is_valid_source(url):
+        raise HTTPException(400, "Нужен RTSP URL (rtsp://...) или локальная камера (local://0)")
+    if not update_camera(cid, item.name.strip(), url, item.vendor):
+        raise HTTPException(404, "Камера не найдена")
+    manager.sync()
+    return {"ok": True}
 
 
 @router.delete("/cameras/{cid}")
